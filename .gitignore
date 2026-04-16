@@ -39,3 +39,4 @@ htmlcov/
 .idea/
 .vscode/
 *.swp
+config.yaml
