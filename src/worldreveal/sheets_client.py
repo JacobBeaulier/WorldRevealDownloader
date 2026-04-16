@@ -26,6 +26,7 @@ class SheetRow:
     download_flag: bool
     in_folder: bool
     drive_link: str
+    team_number: str
 
 
 @dataclass
@@ -116,6 +117,11 @@ class SheetsClient:
                 else ""
             )
             drive_link = padded[column_index[self._columns.drive_link] - 1].strip()
+            team_number = (
+                padded[column_index[self._columns.team_number] - 1].strip()
+                if self._columns.team_number in column_index
+                else ""
+            )
             rows.append(
                 SheetRow(
                     sheet_title=title,
@@ -124,6 +130,7 @@ class SheetsClient:
                     download_flag=download_flag,
                     in_folder=in_folder,
                     drive_link=drive_link,
+                    team_number=team_number,
                 )
             )
         return SheetTab(title=title, header=header, rows=rows, column_index=column_index)

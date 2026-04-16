@@ -28,9 +28,17 @@ log = logging.getLogger(__name__)
 _FILENAME_BAD = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
-def _safe_filename(title: str) -> str:
-    cleaned = _FILENAME_BAD.sub("_", title).strip().rstrip(".")
-    return (cleaned or "video")[:180]
+def _safe_filename_part(value: str, fallback: str = "") -> str:
+    cleaned = _FILENAME_BAD.sub("_", value).strip().rstrip(".")
+    return cleaned or fallback
+
+
+def _build_drive_filename(team_number: str, title: str, video_id: str) -> str:
+    """<teamNumber>_<youtubeVideoName>.mp4, with unsafe chars scrubbed."""
+    team = _safe_filename_part(team_number)
+    name = _safe_filename_part(title, fallback=video_id)
+    stem = f"{team}_{name}" if team else name
+    return f"{stem[:180]}.mp4"
 
 
 @dataclass
@@ -219,7 +227,7 @@ class Monitor:
                 log.info("%s Downloading %r (%s)", tag, info.title, info.video_id)
                 info, local_path = download_video(row.link, self._cfg.download_dir)
 
-                filename = f"{_safe_filename(info.title)}.mp4"
+                filename = _build_drive_filename(row.team_number, info.title, info.video_id)
                 log.info("%s Uploading to Drive as %r", tag, filename)
                 uploaded = self._drive.upload_video(
                     local_path=local_path,

@@ -13,7 +13,8 @@ columns:
   link: "Link"
   download_flag: "Download Video?"
   in_folder: "In Folder"
-  drive_link: "Drive Link"  # created automatically if missing
+  drive_link: "Drive Link"    # created automatically if missing
+  team_number: "Team Number"  # prefixed onto Drive filename: "<team>_<title>.mp4"
 
 # How often the monitor sweeps the sheet, in seconds.
 poll_interval_seconds: 300

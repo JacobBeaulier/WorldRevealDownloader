@@ -15,6 +15,7 @@ class ColumnNames:
     download_flag: str = "Download Video?"
     in_folder: str = "In Folder"
     drive_link: str = "Drive Link"
+    team_number: str = "Team Number"
 
 
 @dataclass
@@ -54,6 +55,7 @@ class Config:
             download_flag=cols_raw.get("download_flag", "Download Video?"),
             in_folder=cols_raw.get("in_folder", "In Folder"),
             drive_link=cols_raw.get("drive_link", "Drive Link"),
+            team_number=cols_raw.get("team_number", "Team Number"),
         )
 
         log_file_raw = env_override("log_file", raw.get("log_file", "./logs/worldreveal.log"))
