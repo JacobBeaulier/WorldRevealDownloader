@@ -7,7 +7,7 @@ import logging
 import sys
 from pathlib import Path
 
-from .auth import get_credentials
+from .auth import OAuthClientMissingError, get_credentials
 from .config import Config
 from .drive_client import DriveClient
 from .logging_setup import configure_logging
@@ -54,8 +54,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         creds = get_credentials(cfg.credentials_dir)
-    except FileNotFoundError as e:
-        log.error(str(e))
+    except OAuthClientMissingError:
+        # Setup instructions were already printed to stderr by get_credentials.
         return 2
     except Exception:
         log.exception("OAuth failed.")

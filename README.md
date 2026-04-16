@@ -32,15 +32,20 @@ pip install -e .
 cp config.example.yaml config.yaml
 # Edit config.yaml if you want to change defaults.
 
-# 3. Create a Google Cloud OAuth client:
-#    - https://console.cloud.google.com/apis/credentials
-#    - Create OAuth client ID -> Application type: "Desktop app".
-#    - Enable APIs: Google Sheets API, Google Drive API.
+# 3. Create a Google Cloud OAuth client (one-time, ~3 min):
+#    - https://console.cloud.google.com/projectcreate (any project name)
+#    - Enable the Google Sheets API and Google Drive API on that project.
+#    - Configure the OAuth consent screen (External), add yourself as a Test user.
+#    - Create an OAuth client ID -> Application type: "Desktop app".
 #    - Download the client JSON and save it as:
 #         credentials/oauth_client.json
 #
-# 4. One-time auth (opens browser, caches token to credentials/token.json):
-worldreveal --auth-only
+#    If you skip step 3, the tool will print these instructions on first run.
+
+# 4. Run it. On the first launch it opens your browser to Google's
+#    sign-in page, captures the redirect, caches the token to
+#    credentials/token.json, and continues. No separate auth command needed.
+worldreveal
 ```
 
 ## Running
