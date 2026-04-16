@@ -52,7 +52,12 @@ class DriveClient:
         self._creds = creds
 
         def _build_request(_http, *args, **kwargs):
-            return HttpRequest(AuthorizedHttp(creds, http=httplib2.Http()), *args, **kwargs)
+            http = httplib2.Http()
+            # Google's resumable upload returns 308 "Resume Incomplete" with no
+            # Location header. httplib2 otherwise treats any 3xx as a redirect and
+            # aborts with RedirectMissingLocation before googleapiclient can see it.
+            http.follow_redirects = False
+            return HttpRequest(AuthorizedHttp(creds, http=http), *args, **kwargs)
 
         self._svc = build(
             "drive",
