@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "worldreveal-downloader"
+version = "0.1.0"
+description = "Monitor a Google Sheet and mirror YouTube videos into a Drive folder tree."
+requires-python = ">=3.10"
+readme = "README.md"
+dependencies = [
+    "yt-dlp>=2024.10.7",
+    "google-api-python-client>=2.140.0",
+    "google-auth>=2.34.0",
+    "google-auth-oauthlib>=1.2.1",
+    "google-auth-httplib2>=0.2.0",
+    "gspread>=6.1.2",
+    "PyYAML>=6.0.2",
+]
+
+[project.scripts]
+worldreveal = "worldreveal.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

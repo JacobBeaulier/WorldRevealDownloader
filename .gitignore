@@ -1,0 +1,41 @@
+# Credentials / tokens - never commit these
+credentials/*.json
+!credentials/.gitkeep
+.env
+*.pem
+
+# Downloads scratch dir
+downloads/
+*.mp4
+*.mkv
+*.webm
+*.part
+*.ytdl
+
+# Logs
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

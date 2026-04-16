@@ -1,0 +1,29 @@
+# Copy to config.yaml and fill in.
+# Any value may also be supplied via env var WORLDREVEAL_<UPPER_KEY>.
+
+spreadsheet_id: "1GRqNKVDjwLYH8z9TRFP5QXV4FzuxXAajaHi82WPvdfc"
+drive_root_folder_id: "1sdkRI76YygZpE_u8VDLPVuHlgOGP3WgX"
+
+# Sheets whose tab name matches any of these are ignored.
+skip_sheets:
+  - "OTWTW V5"
+
+# Column headers (case-sensitive, matched in row 1 of each tab).
+columns:
+  link: "Link"
+  download_flag: "Download Video?"
+  in_folder: "In Folder"
+  drive_link: "Drive Link"  # created automatically if missing
+
+# How often the monitor sweeps the sheet, in seconds.
+poll_interval_seconds: 300
+
+# Max concurrent download+upload pipelines.
+concurrency: 3
+
+# Where yt-dlp writes files before they're uploaded. Cleared after each upload.
+download_dir: "./downloads"
+
+# Logging
+log_level: "INFO"
+log_file: "./logs/worldreveal.log"
