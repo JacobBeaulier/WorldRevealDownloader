@@ -144,6 +144,7 @@ class Monitor:
         """Reconcile sheet rows against Drive state; return the list of rows to download."""
         reconcile: list[tuple[int, str]] = []  # (row_number, drive_link)
         jobs: list[Job] = []
+        skipped_non_video = 0
 
         for row in tab.rows:
             url = row.link
@@ -151,7 +152,8 @@ class Monitor:
                 continue
 
             if looks_like_channel_or_playlist(url):
-                log.info("[%s!%d] Skipping channel/playlist URL: %s", tab.title, row.row_number, url)
+                skipped_non_video += 1
+                log.debug("[%s!%d] Skipping channel/playlist URL: %s", tab.title, row.row_number, url)
                 continue
 
             # We need the video ID to check Drive. Cheap path: regex it from the URL.
@@ -173,6 +175,17 @@ class Monitor:
                 self._sheets.batch_update_drive_links(tab, reconcile)
             except Exception:
                 log.exception("Failed to reconcile Drive links for tab %r.", tab.title)
+
+        # Single-line per-tab summary at INFO. The per-row skip details are
+        # available at DEBUG for anyone who needs them.
+        if jobs or reconcile or skipped_non_video:
+            log.info(
+                "[%s] plan: %d to download, %d already in Drive, %d non-video skipped.",
+                tab.title,
+                len(jobs),
+                len(reconcile),
+                skipped_non_video,
+            )
 
         return jobs
 
