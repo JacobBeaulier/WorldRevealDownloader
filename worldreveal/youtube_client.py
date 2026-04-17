@@ -72,8 +72,16 @@ def _ydl_opts_download(output_dir: Path) -> dict:
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
-        # Prefer progressive MP4; fall back to best video+audio merged into MP4.
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        # H.264 (avc1) video + AAC (mp4a) audio only — no VP9, no AV1, no Opus.
+        # YouTube serves H.264 up to 1080p; higher resolutions are VP9/AV1 only,
+        # so this effectively caps quality at 1080p (fine for reveal videos).
+        # If none of these selectors match, the download fails loudly rather
+        # than silently falling back to a different codec.
+        "format": (
+            "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]"
+            "/bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]"
+            "/best[vcodec^=avc1][acodec^=mp4a]"
+        ),
         "merge_output_format": "mp4",
         "outtmpl": str(output_dir / "%(id)s.%(ext)s"),
         "restrictfilenames": False,
@@ -82,7 +90,9 @@ def _ydl_opts_download(output_dir: Path) -> dict:
         "fragment_retries": 5,
         "concurrent_fragment_downloads": 4,
         "postprocessors": [
-            {"key": "FFmpegVideoConvertor", "preferedformat": "mp4"},
+            # Remux-only (no re-encode). The format selector already guarantees
+            # H.264/AAC streams, so ffmpeg just changes the container if needed.
+            {"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"},
         ],
     }
 
