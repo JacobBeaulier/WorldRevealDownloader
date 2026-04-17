@@ -1,9 +1,12 @@
-"""yt-dlp wrapper — classify URLs, fetch metadata, download to MP4."""
+"""yt-dlp wrapper — classify URLs, fetch metadata, download to MP4 (H.264)."""
 
 from __future__ import annotations
 
 import logging
 import re
+import shutil
+import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -72,15 +75,12 @@ def _ydl_opts_download(output_dir: Path) -> dict:
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
-        # H.264 (avc1) video + AAC (mp4a) audio only — no VP9, no AV1, no Opus.
-        # YouTube serves H.264 up to 1080p; higher resolutions are VP9/AV1 only,
-        # so this effectively caps quality at 1080p (fine for reveal videos).
-        # If none of these selectors match, the download fails loudly rather
-        # than silently falling back to a different codec.
+        # Highest available quality regardless of codec. If the result is not
+        # H.264/AAC, we transcode to H.264 MP4 after yt-dlp finishes. Preferring
+        # H.264 first still avoids a transcode when YouTube offers it natively.
         "format": (
             "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]"
-            "/bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]"
-            "/best[vcodec^=avc1][acodec^=mp4a]"
+            "/bestvideo+bestaudio/best"
         ),
         "merge_output_format": "mp4",
         "outtmpl": str(output_dir / "%(id)s.%(ext)s"),
@@ -90,8 +90,9 @@ def _ydl_opts_download(output_dir: Path) -> dict:
         "fragment_retries": 5,
         "concurrent_fragment_downloads": 4,
         "postprocessors": [
-            # Remux-only (no re-encode). The format selector already guarantees
-            # H.264/AAC streams, so ffmpeg just changes the container if needed.
+            # Remux-only: if the streams are MP4-compatible (H.264/AAC), ffmpeg
+            # just swaps the container. Otherwise the file keeps its original
+            # container (webm/mkv) and we re-encode in a dedicated pass below.
             {"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"},
         ],
     }
@@ -163,4 +164,117 @@ def download_video(url: str, output_dir: Path) -> tuple[VideoInfo, Path]:
         webpage_url=info.get("webpage_url") or url,
     )
     log.info("Downloaded %s (%s) -> %s", vi.title, vi.video_id, local_path)
+
+    # If the pulled streams aren't H.264/AAC, re-encode to H.264 MP4 before
+    # the file ever leaves the machine. Already-H.264 files are a no-op.
+    local_path = _ensure_h264_mp4(local_path)
     return vi, local_path
+
+
+# --------------------------------------------------------------- transcoding
+
+
+def _run(cmd: list[str]) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, capture_output=True, text=True, check=False)
+
+
+def _probe_codecs(path: Path) -> tuple[str | None, str | None]:
+    """Return (video_codec, audio_codec) for path, or (None, None) on probe failure."""
+    if not shutil.which("ffprobe"):
+        raise RuntimeError("ffprobe not found on PATH (install ffmpeg).")
+
+    def _codec(stream_selector: str) -> str | None:
+        res = _run(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-select_streams", stream_selector,
+                "-show_entries", "stream=codec_name",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                str(path),
+            ]
+        )
+        if res.returncode != 0:
+            return None
+        out = res.stdout.strip()
+        return out or None
+
+    return _codec("v:0"), _codec("a:0")
+
+
+def _ensure_h264_mp4(path: Path) -> Path:
+    """Return path if it's already H.264 MP4; otherwise re-encode in place."""
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError("ffmpeg not found on PATH (install ffmpeg).")
+
+    vcodec, acodec = _probe_codecs(path)
+    is_mp4 = path.suffix.lower() == ".mp4"
+
+    if vcodec == "h264" and acodec == "aac" and is_mp4:
+        log.debug("%s is already H.264/AAC MP4; no transcode needed.", path.name)
+        return path
+
+    # What action we'll take, for the log line:
+    needs_video_reencode = vcodec != "h264"
+    needs_audio_reencode = acodec not in {"aac", "mp4a"}
+    action = []
+    if needs_video_reencode:
+        action.append(f"video {vcodec or '?'}→h264")
+    else:
+        action.append("video copy")
+    if needs_audio_reencode:
+        action.append(f"audio {acodec or '?'}→aac")
+    else:
+        action.append("audio copy")
+
+    target = path.with_suffix(".h264.mp4")
+    log.info("Transcoding %s (%s)", path.name, ", ".join(action))
+
+    cmd = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel", "error",
+        "-stats",
+        "-y",
+        "-i", str(path),
+        "-map", "0:v:0",
+        "-map", "0:a:0?",  # optional: video may have no audio track
+    ]
+    if needs_video_reencode:
+        cmd += [
+            "-c:v", "libx264",
+            "-preset", "medium",
+            "-crf", "20",
+            "-pix_fmt", "yuv420p",
+        ]
+    else:
+        cmd += ["-c:v", "copy"]
+    if needs_audio_reencode:
+        cmd += ["-c:a", "aac", "-b:a", "192k"]
+    else:
+        cmd += ["-c:a", "copy"]
+    cmd += ["-movflags", "+faststart", str(target)]
+
+    start = time.monotonic()
+    res = _run(cmd)
+    elapsed = time.monotonic() - start
+    if res.returncode != 0:
+        # Clean up partial output.
+        if target.exists():
+            try:
+                target.unlink()
+            except OSError:
+                pass
+        raise RuntimeError(
+            f"ffmpeg transcode failed for {path.name} ({res.returncode}): {res.stderr.strip()[:500]}"
+        )
+
+    # Replace the original with the transcoded file.
+    final = path.with_suffix(".mp4")
+    try:
+        path.unlink()
+    except OSError:
+        pass
+    target.replace(final)
+    log.info("Transcoded %s in %.1fs -> %s", path.name, elapsed, final.name)
+    return final
