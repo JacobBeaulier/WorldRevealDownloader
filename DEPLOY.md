@@ -88,6 +88,44 @@ scp credentials/oauth_client.json credentials/token.json \
     deploy@<server-ip>:~/WorldRevealDownloader/credentials/
 ```
 
+### 4a. YouTube cookies (required on Hetzner / datacenter IPs)
+
+YouTube bot-challenges anonymous requests coming from datacenter IP ranges
+("Sign in to confirm you're not a bot"). yt-dlp sails through when it can send
+cookies from a logged-in session. Strongly recommend using a **throwaway Google
+account** so if YouTube ever flags the cookies, your main account isn't touched.
+
+Export cookies from a browser where you're signed into YouTube as that
+throwaway account:
+
+**Option A — Chrome/Edge/Brave extension (easiest):** install [Get cookies.txt
+LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc).
+Visit https://www.youtube.com while signed in, click the extension, "Export"
+→ "youtube.com". Save it as `youtube_cookies.txt`.
+
+**Option B — yt-dlp on your Mac:**
+
+```bash
+# Quit Chrome first (the cookie DB must not be in use).
+yt-dlp --cookies-from-browser chrome --cookies youtube_cookies.txt \
+       --skip-download "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+```
+
+Then ship the cookies file up and point config.yaml at it:
+
+```bash
+scp youtube_cookies.txt deploy@<server-ip>:~/WorldRevealDownloader/credentials/
+```
+
+Add this to `config.yaml` (on the server, or on the Mac before scp'ing):
+
+```yaml
+cookies_file: "./credentials/youtube_cookies.txt"
+```
+
+Cookies live for weeks to months. If YouTube starts 403-ing again, re-export
+and re-upload the file — no restart needed (yt-dlp re-reads it each call).
+
 ## 5. Start the service
 
 ```bash
@@ -155,4 +193,7 @@ rarely the bottleneck — 20 TB/mo covers several thousand 1080p uploads.
 - **`ffmpeg not found`** — the image bakes ffmpeg in. If you see this, you're
   running against an old image: `docker compose build --no-cache && docker compose up -d`.
 - **Invalid grant / token expired** — see the OAuth refresh section above.
+- **`Sign in to confirm you're not a bot`** from yt-dlp — YouTube is challenging
+  the datacenter IP. Export fresh cookies from a logged-in browser session (see
+  section 4a) and `scp` them to `credentials/youtube_cookies.txt`.
 - **Time skew** warnings from Google — `sudo timedatectl set-ntp true`.
