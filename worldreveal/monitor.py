@@ -97,6 +97,12 @@ class Monitor:
         else:
             log.info("YouTube cookies: not configured (fine on residential IPs; "
                      "datacenter IPs usually need cookies).")
+        if self._cfg.proxy:
+            # Don't log credentials if they're embedded in the URL.
+            redacted = re.sub(r"://[^@/]+@", "://***@", self._cfg.proxy)
+            log.info("yt-dlp proxy: %s", redacted)
+        else:
+            log.info("yt-dlp proxy: not configured (direct connection).")
         while not self._stop_event.is_set():
             start = time.monotonic()
             try:
@@ -224,7 +230,11 @@ class Monitor:
 
         # Resolve metadata first so we can early-dedupe by the authoritative video ID.
         try:
-            info: VideoInfo = fetch_video_info(row.link, cookies_file=self._cfg.cookies_file)
+            info: VideoInfo = fetch_video_info(
+                row.link,
+                cookies_file=self._cfg.cookies_file,
+                proxy=self._cfg.proxy,
+            )
         except NotAVideoError as e:
             log.info("%s Skipping — %s", tag, e)
             return
@@ -259,6 +269,7 @@ class Monitor:
                     row.link,
                     self._cfg.download_dir,
                     cookies_file=self._cfg.cookies_file,
+                    proxy=self._cfg.proxy,
                 )
 
                 filename = _build_drive_filename(row.team_number, info.title, info.video_id)
