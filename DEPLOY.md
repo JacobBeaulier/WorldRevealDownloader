@@ -94,6 +94,12 @@ scp credentials/oauth_client.json credentials/token.json \
 # On the server:
 cd ~/WorldRevealDownloader
 
+# Pre-create the bind-mount dirs as the deploy user (UID 1000). The container
+# runs as UID 1000; if these don't exist when `docker compose up` runs, the
+# Docker daemon creates them as root:root and the container can't write.
+mkdir -p logs credentials downloads
+sudo chown -R 1000:1000 logs credentials downloads
+
 docker compose up -d --build
 docker compose logs -f       # Ctrl-C to detach; service keeps running
 ```
@@ -137,9 +143,15 @@ rarely the bottleneck — 20 TB/mo covers several thousand 1080p uploads.
 
 ## Troubleshooting
 
-- **`permission denied` on `./credentials/token.json`** inside the container —
-  the container runs as UID 1000. `sudo chown -R 1000:1000 credentials logs` on
-  the host, or recreate those dirs with the `deploy` user who already is 1000.
+- **`PermissionError: [Errno 13] Permission denied: '/app/logs/worldreveal.log'`**
+  or similar in `credentials/` — the bind-mounted dir on the host is owned by
+  root (Docker auto-created it because it didn't exist). Fix:
+  ```bash
+  docker compose down
+  mkdir -p logs credentials downloads
+  sudo chown -R 1000:1000 logs credentials downloads
+  docker compose up -d
+  ```
 - **`ffmpeg not found`** — the image bakes ffmpeg in. If you see this, you're
   running against an old image: `docker compose build --no-cache && docker compose up -d`.
 - **Invalid grant / token expired** — see the OAuth refresh section above.
