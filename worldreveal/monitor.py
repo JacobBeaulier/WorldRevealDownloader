@@ -74,10 +74,17 @@ class Monitor:
         signal.signal(signal.SIGTERM, handler)
 
     def run_forever(self) -> None:
+        try:
+            import yt_dlp  # lazy: avoid import cost at module load
+
+            ytdlp_version = getattr(yt_dlp.version, "__version__", "unknown")
+        except Exception:
+            ytdlp_version = "unknown"
         log.info(
-            "Starting monitor: poll every %ds, concurrency=%d, spreadsheet=%s",
+            "Starting monitor: poll every %ds, concurrency=%d, yt-dlp=%s, spreadsheet=%s",
             self._cfg.poll_interval_seconds,
             self._cfg.concurrency,
+            ytdlp_version,
             self._cfg.spreadsheet_id,
         )
         if self._cfg.cookies_file:

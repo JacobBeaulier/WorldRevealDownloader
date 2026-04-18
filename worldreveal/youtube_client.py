@@ -60,6 +60,27 @@ def looks_like_video(url: str) -> bool:
     return False
 
 
+# Player clients to try, in order. YouTube bot-challenges the default "web"
+# client hardest; "tv" and "web_safari" are typically much more permissive.
+# yt-dlp walks the list until one succeeds.
+_YT_PLAYER_CLIENTS = ["tv", "web_safari", "web"]
+
+
+def _base_ytdlp_opts() -> dict:
+    return {
+        "extractor_args": {"youtube": {"player_client": _YT_PLAYER_CLIENTS}},
+        # Mimic a current desktop Safari UA. yt-dlp's default is fine in most
+        # cases but a realistic UA occasionally helps on flagged IPs.
+        "http_headers": {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) "
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                "Version/17.5 Safari/605.1.15"
+            ),
+        },
+    }
+
+
 def _apply_cookies(opts: dict, cookies_file: Path | None) -> dict:
     """Attach a cookies file to a yt-dlp opts dict if one is configured and readable."""
     if cookies_file is None:
@@ -75,6 +96,7 @@ def _apply_cookies(opts: dict, cookies_file: Path | None) -> dict:
 def _ydl_opts_metadata(cookies_file: Path | None = None) -> dict:
     return _apply_cookies(
         {
+            **_base_ytdlp_opts(),
             "quiet": True,
             "no_warnings": True,
             "skip_download": True,
@@ -88,6 +110,7 @@ def _ydl_opts_metadata(cookies_file: Path | None = None) -> dict:
 def _ydl_opts_download(output_dir: Path, cookies_file: Path | None = None) -> dict:
     return _apply_cookies(
         {
+            **_base_ytdlp_opts(),
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
