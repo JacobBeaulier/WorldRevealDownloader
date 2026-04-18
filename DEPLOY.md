@@ -123,8 +123,57 @@ Add this to `config.yaml` (on the server, or on the Mac before scp'ing):
 cookies_file: "./credentials/youtube_cookies.txt"
 ```
 
-Cookies live for weeks to months. If YouTube starts 403-ing again, re-export
-and re-upload the file — no restart needed (yt-dlp re-reads it each call).
+Cookies live for weeks to months **on a residential IP**. On a datacenter IP
+(like Hetzner) YouTube often invalidates them within hours and you're back in
+the bot-challenge loop. If you hit that, jump to section 4b.
+
+### 4b. Residential proxy (durable fix for datacenter IPs)
+
+If you're re-exporting cookies constantly, YouTube is flagging the Hetzner IP
+range and cookies alone won't hold. The durable fix is routing yt-dlp's
+requests through a **residential-IP proxy** — YouTube sees the traffic coming
+from someone's home ISP and stops challenging it. Drive and Sheets calls
+bypass the proxy (they're unaffected by any of this).
+
+Bandwidth is the cost driver: a 500 MB video download = 500 MB of proxy
+traffic. For a few dozen videos/day, budget a few GB/day.
+
+| Provider | Starting cost | Notes |
+| --- | --- | --- |
+| [Webshare](https://www.webshare.io/) | Free tier: 1 GB/mo, ~$3/mo for 10 GB | Simplest signup; pick "Rotating residential". |
+| [IPRoyal](https://iproyal.com/residential-proxies/) | ~$1.75/GB pay-as-you-go | No subscription; pay only for what you use. |
+| [Smartproxy](https://smartproxy.com/) | ~$7/GB | Slightly pricier, very reliable. |
+
+Pick any of the above, create an account, and get a proxy endpoint in the
+form:
+
+```
+http://<user>:<pass>@<host>:<port>
+```
+
+Add this to `config.yaml`:
+
+```yaml
+proxy: "http://jacob-rotating:hunter2@p.webshare.io:80"
+```
+
+Then on the server:
+
+```bash
+cd ~/WorldRevealDownloader
+git pull
+docker compose up -d --build
+docker compose logs -f | head -20
+```
+
+You'll see:
+
+```
+INFO worldreveal.monitor | yt-dlp proxy: http://***@p.webshare.io:80
+```
+
+confirming the proxy loaded. Once this is set up, cookies become optional —
+you can leave `cookies_file` set (belt and braces) or remove it.
 
 ## 5. Start the service
 
@@ -194,6 +243,6 @@ rarely the bottleneck — 20 TB/mo covers several thousand 1080p uploads.
   running against an old image: `docker compose build --no-cache && docker compose up -d`.
 - **Invalid grant / token expired** — see the OAuth refresh section above.
 - **`Sign in to confirm you're not a bot`** from yt-dlp — YouTube is challenging
-  the datacenter IP. Export fresh cookies from a logged-in browser session (see
-  section 4a) and `scp` them to `credentials/youtube_cookies.txt`.
+  the datacenter IP. Short-term: re-export cookies (section 4a). Durable fix:
+  add a residential proxy (section 4b) — stops the cycle.
 - **Time skew** warnings from Google — `sudo timedatectl set-ntp true`.
