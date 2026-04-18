@@ -80,6 +80,16 @@ class Monitor:
             self._cfg.concurrency,
             self._cfg.spreadsheet_id,
         )
+        if self._cfg.cookies_file:
+            exists = Path(self._cfg.cookies_file).exists()
+            log.info(
+                "YouTube cookies: %s (%s)",
+                self._cfg.cookies_file,
+                "loaded" if exists else "MISSING — running without cookies",
+            )
+        else:
+            log.info("YouTube cookies: not configured (fine on residential IPs; "
+                     "datacenter IPs usually need cookies).")
         while not self._stop_event.is_set():
             start = time.monotonic()
             try:
@@ -207,7 +217,7 @@ class Monitor:
 
         # Resolve metadata first so we can early-dedupe by the authoritative video ID.
         try:
-            info: VideoInfo = fetch_video_info(row.link)
+            info: VideoInfo = fetch_video_info(row.link, cookies_file=self._cfg.cookies_file)
         except NotAVideoError as e:
             log.info("%s Skipping — %s", tag, e)
             return
@@ -238,7 +248,11 @@ class Monitor:
             local_path: Path | None = None
             try:
                 log.info("%s Downloading %r (%s)", tag, info.title, info.video_id)
-                info, local_path = download_video(row.link, self._cfg.download_dir)
+                info, local_path = download_video(
+                    row.link,
+                    self._cfg.download_dir,
+                    cookies_file=self._cfg.cookies_file,
+                )
 
                 filename = _build_drive_filename(row.team_number, info.title, info.video_id)
                 log.info("%s Uploading to Drive as %r", tag, filename)
