@@ -28,3 +28,10 @@ download_dir: "./downloads"
 # Logging
 log_level: "INFO"
 log_file: "./logs/worldreveal.log"
+
+# Optional: path to a Netscape-format YouTube cookies file.
+# Required on datacenter IPs (Hetzner, AWS, etc.) because YouTube blocks
+# anonymous requests with a bot challenge. On a residential IP (your Mac at
+# home) you can leave this unset.
+# See DEPLOY.md for how to export cookies from your browser.
+# cookies_file: "./credentials/youtube_cookies.txt"

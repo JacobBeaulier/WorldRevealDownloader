@@ -30,6 +30,10 @@ class Config:
     log_level: str = "INFO"
     log_file: Path | None = Path("./logs/worldreveal.log")
     credentials_dir: Path = Path("./credentials")
+    # Optional path to a Netscape-format cookies file. Required when running
+    # from a datacenter IP (e.g. Hetzner) — YouTube bot-challenges unsigned
+    # datacenter requests and demands cookies from a logged-in session.
+    cookies_file: Path | None = None
 
     @classmethod
     def load(cls, path: Path | str = "config.yaml") -> "Config":
@@ -61,6 +65,9 @@ class Config:
         log_file_raw = env_override("log_file", raw.get("log_file", "./logs/worldreveal.log"))
         log_file = Path(log_file_raw) if log_file_raw else None
 
+        cookies_raw = env_override("cookies_file", raw.get("cookies_file"))
+        cookies_file = Path(cookies_raw) if cookies_raw else None
+
         return cls(
             spreadsheet_id=spreadsheet_id,
             drive_root_folder_id=drive_root,
@@ -72,4 +79,5 @@ class Config:
             log_level=str(env_override("log_level", raw.get("log_level", "INFO"))).upper(),
             log_file=log_file,
             credentials_dir=Path(env_override("credentials_dir", raw.get("credentials_dir", "./credentials"))),
+            cookies_file=cookies_file,
         )
