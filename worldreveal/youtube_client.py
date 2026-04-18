@@ -60,10 +60,12 @@ def looks_like_video(url: str) -> bool:
     return False
 
 
-# Player clients to try, in order. YouTube bot-challenges the default "web"
-# client hardest; "tv" and "web_safari" are typically much more permissive.
-# yt-dlp walks the list until one succeeds.
-_YT_PLAYER_CLIENTS = ["tv", "web_safari", "web"]
+# Player clients to try, in order. "web_safari" and "web" have the broadest
+# format coverage (including 1080p+ H.264). "tv" is more permissive against
+# bot challenges but sometimes returns zero formats, causing "Requested format
+# is not available" — so we keep it last. With cookies configured (see
+# DEPLOY.md §4a) the web clients sail through without bot checks.
+_YT_PLAYER_CLIENTS = ["web_safari", "web", "mweb", "tv"]
 
 
 def _base_ytdlp_opts() -> dict:
