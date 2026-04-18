@@ -34,6 +34,11 @@ class Config:
     # from a datacenter IP (e.g. Hetzner) — YouTube bot-challenges unsigned
     # datacenter requests and demands cookies from a logged-in session.
     cookies_file: Path | None = None
+    # Optional HTTP/HTTPS/SOCKS proxy URL for yt-dlp only. Use a residential
+    # proxy on datacenter IPs to stop YouTube bot-flagging. Format examples:
+    #   http://user:pass@host:port
+    #   socks5://user:pass@host:port
+    proxy: str | None = None
 
     @classmethod
     def load(cls, path: Path | str = "config.yaml") -> "Config":
@@ -68,6 +73,9 @@ class Config:
         cookies_raw = env_override("cookies_file", raw.get("cookies_file"))
         cookies_file = Path(cookies_raw) if cookies_raw else None
 
+        proxy_raw = env_override("proxy", raw.get("proxy"))
+        proxy = str(proxy_raw).strip() if proxy_raw else None
+
         return cls(
             spreadsheet_id=spreadsheet_id,
             drive_root_folder_id=drive_root,
@@ -80,4 +88,5 @@ class Config:
             log_file=log_file,
             credentials_dir=Path(env_override("credentials_dir", raw.get("credentials_dir", "./credentials"))),
             cookies_file=cookies_file,
+            proxy=proxy,
         )

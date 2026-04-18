@@ -35,3 +35,12 @@ log_file: "./logs/worldreveal.log"
 # home) you can leave this unset.
 # See DEPLOY.md for how to export cookies from your browser.
 # cookies_file: "./credentials/youtube_cookies.txt"
+
+# Optional: HTTP/HTTPS/SOCKS proxy URL for yt-dlp only (Drive/Sheets don't
+# need it). On datacenter IPs, a residential-IP proxy eliminates YouTube
+# bot-flagging entirely and cookies become optional. Example providers:
+# Webshare, Smartproxy, IPRoyal, Bright Data (~$3-30/mo for a few GB).
+# Format:
+#   http://user:pass@host:port
+#   socks5://user:pass@host:port
+# proxy: "http://user:pass@proxy.example.com:8080"

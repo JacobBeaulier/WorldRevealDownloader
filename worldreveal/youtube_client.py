@@ -95,58 +95,76 @@ def _apply_cookies(opts: dict, cookies_file: Path | None) -> dict:
     return opts
 
 
-def _ydl_opts_metadata(cookies_file: Path | None = None) -> dict:
-    return _apply_cookies(
-        {
-            **_base_ytdlp_opts(),
-            "quiet": True,
-            "no_warnings": True,
-            "skip_download": True,
-            "noplaylist": True,
-            "extract_flat": False,
-        },
-        cookies_file,
+def _apply_proxy(opts: dict, proxy: str | None) -> dict:
+    if proxy:
+        opts["proxy"] = proxy
+    return opts
+
+
+def _ydl_opts_metadata(
+    cookies_file: Path | None = None,
+    proxy: str | None = None,
+) -> dict:
+    return _apply_proxy(
+        _apply_cookies(
+            {
+                **_base_ytdlp_opts(),
+                "quiet": True,
+                "no_warnings": True,
+                "skip_download": True,
+                "noplaylist": True,
+                "extract_flat": False,
+            },
+            cookies_file,
+        ),
+        proxy,
     )
 
 
-def _ydl_opts_download(output_dir: Path, cookies_file: Path | None = None) -> dict:
-    return _apply_cookies(
-        {
-            **_base_ytdlp_opts(),
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
-            # Highest available quality regardless of codec. If the result is not
-            # H.264/AAC, we transcode to H.264 MP4 after yt-dlp finishes. Preferring
-            # H.264 first still avoids a transcode when YouTube offers it natively.
-            "format": (
-                "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]"
-                "/bestvideo+bestaudio/best"
-            ),
-            "merge_output_format": "mp4",
-            "outtmpl": str(output_dir / "%(id)s.%(ext)s"),
-            "restrictfilenames": False,
-            "overwrites": True,
-            "retries": 5,
-            "fragment_retries": 5,
-            "concurrent_fragment_downloads": 4,
-            "postprocessors": [
-                # Remux-only: if the streams are MP4-compatible (H.264/AAC), ffmpeg
-                # just swaps the container. Otherwise the file keeps its original
-                # container (webm/mkv) and we re-encode in a dedicated pass below.
-                {"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"},
-            ],
-        },
-        cookies_file,
-    )
+def _ydl_opts_download(
+    output_dir: Path,
+    cookies_file: Path | None = None,
+    proxy: str | None = None,
+) -> dict:
+    opts = {
+        **_base_ytdlp_opts(),
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        # Highest available quality regardless of codec. If the result is not
+        # H.264/AAC, we transcode to H.264 MP4 after yt-dlp finishes. Preferring
+        # H.264 first still avoids a transcode when YouTube offers it natively.
+        "format": (
+            "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]"
+            "/bestvideo+bestaudio/best"
+        ),
+        "merge_output_format": "mp4",
+        "outtmpl": str(output_dir / "%(id)s.%(ext)s"),
+        "restrictfilenames": False,
+        "overwrites": True,
+        "retries": 5,
+        "fragment_retries": 5,
+        "concurrent_fragment_downloads": 4,
+        "postprocessors": [
+            # Remux-only: if the streams are MP4-compatible (H.264/AAC), ffmpeg
+            # just swaps the container. Otherwise the file keeps its original
+            # container (webm/mkv) and we re-encode in a dedicated pass below.
+            {"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"},
+        ],
+    }
+    return _apply_proxy(_apply_cookies(opts, cookies_file), proxy)
 
 
-def fetch_video_info(url: str, cookies_file: Path | None = None) -> VideoInfo:
+def fetch_video_info(
+    url: str,
+    cookies_file: Path | None = None,
+    proxy: str | None = None,
+) -> VideoInfo:
     """Extract metadata without downloading. Raises NotAVideoError for channels/playlists."""
     if looks_like_channel_or_playlist(url):
         raise NotAVideoError(f"URL is a channel or playlist: {url}")
 
-    with YoutubeDL(_ydl_opts_metadata(cookies_file)) as ydl:
+    with YoutubeDL(_ydl_opts_metadata(cookies_file, proxy)) as ydl:
         try:
             info = ydl.extract_info(url, download=False)
         except DownloadError as e:
@@ -176,11 +194,12 @@ def download_video(
     url: str,
     output_dir: Path,
     cookies_file: Path | None = None,
+    proxy: str | None = None,
 ) -> tuple[VideoInfo, Path]:
     """Download the video into output_dir. Returns (info, final local path)."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    with YoutubeDL(_ydl_opts_download(output_dir, cookies_file)) as ydl:
+    with YoutubeDL(_ydl_opts_download(output_dir, cookies_file, proxy)) as ydl:
         try:
             info = ydl.extract_info(url, download=True)
         except DownloadError as e:
