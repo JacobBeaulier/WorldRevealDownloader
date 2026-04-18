@@ -1,0 +1,24 @@
+.git
+.gitignore
+.venv
+venv
+env
+.env
+
+# Artifacts that shouldn't be baked into the image (provide them at run time
+# via bind mounts). Leaving them out also keeps the build context small.
+credentials/*
+!credentials/.gitkeep
+config.yaml
+downloads/
+logs/
+*.log
+*.egg-info
+build
+dist
+__pycache__
+*.py[cod]
+
+# Repo docs not needed in the image
+DEPLOY.md
+reinstall.sh

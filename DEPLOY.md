@@ -1,0 +1,146 @@
+# Deploy to a Hetzner Cloud VPS
+
+End-to-end: a fresh Hetzner box → the monitor running 24/7 in Docker, surviving
+reboots and auto-restarting on crashes. Takes ~15 minutes.
+
+The same instructions work on any other Ubuntu 22.04/24.04 VPS — only step 1
+is Hetzner-specific.
+
+---
+
+## 1. Create the VPS
+
+1. Sign up at https://console.hetzner.cloud/ and create a new project.
+2. Add your SSH public key (Security → SSH Keys). If you need to generate one:
+   ```bash
+   ssh-keygen -t ed25519 -C "you@example.com"
+   # paste ~/.ssh/id_ed25519.pub into Hetzner
+   ```
+3. Create a server:
+   - **Image:** Ubuntu 24.04
+   - **Type:** CX22 (2 vCPU / 4 GB / 40 GB / 20 TB traffic, ~€4.51/mo)
+   - **Location:** any EU location (Nuremberg is typical)
+   - **SSH keys:** select the one you just added
+   - **Name:** `worldreveal`
+4. Note the public IPv4 address it gets.
+
+## 2. First SSH & hardening (one-time, ~3 min)
+
+```bash
+ssh root@<server-ip>
+
+# Create a non-root user you'll use from now on.
+adduser deploy
+usermod -aG sudo deploy
+rsync --archive --chown=deploy:deploy ~/.ssh /home/deploy
+
+# Lock down sshd: no passwords, no root login.
+sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+systemctl restart ssh
+
+# Basic firewall.
+ufw allow OpenSSH
+ufw --force enable
+
+exit
+```
+
+From now on: `ssh deploy@<server-ip>`.
+
+## 3. Install Docker (one-time)
+
+```bash
+ssh deploy@<server-ip>
+
+# Official Docker install script. Safe on Ubuntu.
+curl -fsSL https://get.docker.com | sudo sh
+
+# Let your user run docker without sudo.
+sudo usermod -aG docker "$USER"
+newgrp docker  # or log out/in
+
+docker --version
+docker compose version
+```
+
+## 4. Clone the repo & bring your config over
+
+```bash
+# On the server:
+git clone https://github.com/JacobBeaulier/WorldRevealDownloader.git
+cd WorldRevealDownloader
+git checkout deploy/hetzner
+```
+
+Back on your Mac, push `config.yaml` and the OAuth artifacts over. The easiest
+way is to run the interactive OAuth flow **once on your laptop** (so it can open
+a browser), then copy the resulting token to the server. The refresh token will
+keep the server signed in indefinitely.
+
+```bash
+# On your Mac, in the project directory:
+worldreveal --auth-only   # completes the browser flow, writes credentials/token.json
+
+# Copy the config + OAuth artifacts up.
+scp config.yaml deploy@<server-ip>:~/WorldRevealDownloader/config.yaml
+scp credentials/oauth_client.json credentials/token.json \
+    deploy@<server-ip>:~/WorldRevealDownloader/credentials/
+```
+
+## 5. Start the service
+
+```bash
+# On the server:
+cd ~/WorldRevealDownloader
+
+docker compose up -d --build
+docker compose logs -f       # Ctrl-C to detach; service keeps running
+```
+
+That's it. The monitor is running under Docker with `restart: unless-stopped`,
+so it comes back automatically after a reboot, crash, or `docker system prune`.
+
+## Day-to-day ops
+
+| Task | Command |
+| --- | --- |
+| Tail logs | `docker compose logs -f` |
+| Restart | `docker compose restart` |
+| Stop  | `docker compose down` |
+| Pull updates | `git pull && docker compose up -d --build` |
+| Shell into the container | `docker compose exec worldreveal bash` |
+| Disk usage | `df -h && docker system df` |
+| Reclaim disk | `docker system prune -f` |
+
+Host-side logs are also persisted to `./logs/worldreveal.log` (rotated 10 MB × 5).
+
+## If the OAuth token ever expires for good
+
+Google refresh tokens last indefinitely for "Testing" apps as long as you sign
+in at least every 6 months. If yours does expire:
+
+```bash
+# On your Mac:
+rm credentials/token.json
+worldreveal --auth-only
+scp credentials/token.json deploy@<server-ip>:~/WorldRevealDownloader/credentials/
+ssh deploy@<server-ip> 'cd WorldRevealDownloader && docker compose restart'
+```
+
+## Sizing guidance
+
+CX22 (€4.51/mo) is enough for ~dozens of videos/day with transcoding. If you
+start queuing tall 4K AV1 reveals and want faster transcodes, jump to **CPX21**
+(3 vCPU AMD, €7.05/mo) or **CCX13** (2 dedicated vCPU, €13.49/mo). Bandwidth is
+rarely the bottleneck — 20 TB/mo covers several thousand 1080p uploads.
+
+## Troubleshooting
+
+- **`permission denied` on `./credentials/token.json`** inside the container —
+  the container runs as UID 1000. `sudo chown -R 1000:1000 credentials logs` on
+  the host, or recreate those dirs with the `deploy` user who already is 1000.
+- **`ffmpeg not found`** — the image bakes ffmpeg in. If you see this, you're
+  running against an old image: `docker compose build --no-cache && docker compose up -d`.
+- **Invalid grant / token expired** — see the OAuth refresh section above.
+- **Time skew** warnings from Google — `sudo timedatectl set-ntp true`.

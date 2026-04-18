@@ -1,0 +1,39 @@
+services:
+  worldreveal:
+    build: .
+    image: worldreveal:latest
+    container_name: worldreveal
+    restart: unless-stopped
+
+    # Bind-mount config and long-lived state from the host so you can edit
+    # config.yaml without rebuilding and so the OAuth token survives upgrades.
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./credentials:/app/credentials
+      - ./logs:/app/logs
+      # Ephemeral scratch for yt-dlp. Named volume (not a host bind) so it
+      # doesn't bloat the repo; auto-cleared each sweep by the app itself.
+      - downloads:/app/downloads
+
+    # Give the app time to finish an in-flight upload on `docker compose down`.
+    stop_grace_period: 60s
+
+    # Optional, helps log viewers sort lines correctly.
+    environment:
+      - TZ=UTC
+
+    # Light resource caps. CX22 has 4 GB / 2 vCPU — plenty, but cap to avoid
+    # runaway transcodes starving sshd on the box.
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  downloads:
