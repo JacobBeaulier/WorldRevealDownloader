@@ -11,7 +11,12 @@ WORKDIR /app
 
 # Install deps first for better Docker layer caching.
 COPY requirements.txt pyproject.toml README.md ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir --upgrade yt-dlp
+# ^ yt-dlp is force-upgraded to the latest release on every build. YouTube
+# breaks yt-dlp every few weeks and fixes land in new versions; rebuild the
+# image (`docker compose build --no-cache`) if you start seeing bot-challenge
+# or "Requested format is not available" errors.
 
 # Copy source and install the package.
 COPY worldreveal ./worldreveal
